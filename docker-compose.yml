@@ -1,8 +1,7 @@
-
 services:
   postgres:
     container_name: postgresProject
-    image: postgres:18.1
+    image: postgres:15
     environment:
       POSTGRES_DB: projectdb
       POSTGRES_USER: projectuser
@@ -11,6 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - ./init-db:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U projectuser -d projectdb"]
@@ -24,10 +24,62 @@ services:
     build: ./generator
     depends_on:
       postgres:
-       condition: service_healthy
+        condition: service_healthy
     environment:
       DB_HOST: postgres
       DB_NAME: projectdb
       DB_USER: projectuser
       DB_PASSWORD: 12345project
     restart: unless-stopped
+
+  redash_server:
+    image: redash/redash:latest
+    container_name: redash_server
+    command: server
+    depends_on:
+      - postgres_redash
+      - redis
+    ports:
+      - "5000:5000"
+    environment:
+      REDASH_REDIS_URL: "redis://redis:6379/0"
+      REDASH_DATABASE_URL: "postgresql://redash:redashpassword@postgres_redash:5432/redash"
+      REDASH_COOKIE_SECRET: "redash_cookie_secret_key"
+      REDASH_SECRET_KEY: "redash_secret_key"
+      PYTHONUNBUFFERED: "1"
+
+  redash_worker:
+    image: redash/redash:latest
+    container_name: redash_worker
+    command: worker
+    depends_on:
+      redis:
+        condition: service_started
+      postgres_redash:
+        condition: service_started
+    environment:
+      REDASH_REDIS_URL: "redis://redis:6379/0"
+      REDASH_DATABASE_URL: "postgresql://redash:redashpassword@postgres_redash:5432/redash"
+      REDASH_COOKIE_SECRET: "redash_cookie_secret_key"
+      REDASH_SECRET_KEY: "redash_secret_key"
+      PYTHONUNBUFFERED: "1"
+
+  redis:
+    image: redis:6-alpine
+    container_name: redis
+    restart: unless-stopped
+
+  postgres_redash:
+    image: postgres:15
+    container_name: postgres_redash
+    environment:
+      POSTGRES_USER: redash
+      POSTGRES_PASSWORD: redashpassword
+      POSTGRES_DB: redash
+    volumes:
+      - redash_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redash_postgres_data:
