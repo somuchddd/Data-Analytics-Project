@@ -61,7 +61,7 @@ docker-compose down
 
 Для просмотра базы данных PostgreSQL в терминале необходимо ввести
 ```
-docker exec postgresProject -u projectuser -d projectdb -c 'SELECT * FROM fitness_data'
+docker exec postgresProject psql -U projectuser -d projectdb -c 'SELECT * FROM fitness_data'
 ```
 
 ## Добавление источника данных в Redash
